@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { join } from "path";
-import { readFile } from "fs/promises";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { imageDescriptions } from "@/db/schema";
 import { describeImage } from "@/lib/ai";
+import { fetchFromR2AsBuffer } from "@/lib/r2";
 
 const MODEL = "groq-vision";
 
@@ -39,13 +38,13 @@ export async function POST(req: NextRequest) {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    // ── READ IMAGE FILE ───────────────────────────────────────────────────────
-    const imagePath = join(process.cwd(), "public", "uploads", folderId, bareFilename);
+    // ── FETCH FROM R2 ─────────────────────────────────────────────────────────
+    const key = `uploads/${folderId}/${bareFilename}`;
     let base64: string;
     let mimeType: string;
 
     try {
-      const buffer = await readFile(imagePath);
+      const buffer = await fetchFromR2AsBuffer(key);
       base64 = buffer.toString("base64");
       const ext = bareFilename.split(".").pop()?.toLowerCase();
       mimeType =
@@ -61,7 +60,7 @@ export async function POST(req: NextRequest) {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    // ── DESCRIBE WITH BLIP (+ OpenRouter fallback) ────────────────────────────
+    // ── DESCRIBE WITH GROQ VISION ─────────────────────────────────────────────
     let description: string;
     try {
       description = await describeImage({ base64, mimeType });
@@ -87,7 +86,7 @@ export async function POST(req: NextRequest) {
     // ── SAVE TO CACHE ─────────────────────────────────────────────────────────
     await db
       .insert(imageDescriptions)
-      .values({ folderId, filename: bareFilename, description, model: MODEL, createdAt: new Date() })
+      .values({ folderId, filename: bareFilename, description, model: MODEL })
       .onConflictDoNothing();
     // ─────────────────────────────────────────────────────────────────────────
 

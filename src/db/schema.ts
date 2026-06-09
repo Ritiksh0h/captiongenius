@@ -1,30 +1,28 @@
 import {
-  sqliteTable,
+  pgTable,
   text,
   integer,
+  timestamp,
   primaryKey,
-} from "drizzle-orm/sqlite-core";
+} from "drizzle-orm/pg-core";
 
 // ── Users ─────────────────────────────────────────────────────────────────────
-// Table "User" + column names match the Prisma-created SQLite schema exactly.
-// DATETIME columns store integer milliseconds — timestamp_ms reads them as Date.
-export const users = sqliteTable("User", {
-  id:            text("id").primaryKey(),
-  name:          text("name"),
-  email:         text("email").notNull(),          // unique enforced by existing DB index
-  emailVerified: integer("emailVerified", { mode: "timestamp_ms" }),
-  image:         text("image"),
+export const users = pgTable("User", {
+  id:                   text("id").primaryKey(),
+  name:                 text("name"),
+  email:                text("email").notNull().unique(),
+  emailVerified:        timestamp("emailVerified"),
+  image:                text("image"),
   role:                 text("role").notNull().default("free"),
   captionsUsed:         integer("captionsUsed").notNull().default(0),
-  resetDate:            integer("resetDate", { mode: "timestamp_ms" }),
-  createdAt:            integer("createdAt", { mode: "timestamp_ms" }),
-  // ── Stripe ──────────────────────────────────────────────────────────────────
+  resetDate:            timestamp("resetDate"),
+  createdAt:            timestamp("createdAt").defaultNow(),
   stripeCustomerId:     text("stripeCustomerId"),
   stripeSubscriptionId: text("stripeSubscriptionId"),
 });
 
 // ── NextAuth: accounts ────────────────────────────────────────────────────────
-export const accounts = sqliteTable("Account", {
+export const accounts = pgTable("Account", {
   id:                text("id").primaryKey(),
   userId:            text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   type:              text("type").notNull(),
@@ -40,20 +38,20 @@ export const accounts = sqliteTable("Account", {
 });
 
 // ── NextAuth: sessions ────────────────────────────────────────────────────────
-export const sessions = sqliteTable("Session", {
+export const sessions = pgTable("Session", {
   id:           text("id").primaryKey(),
-  sessionToken: text("sessionToken").notNull(),    // unique enforced by existing DB index
+  sessionToken: text("sessionToken").notNull().unique(),
   userId:       text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
-  expires:      integer("expires", { mode: "timestamp_ms" }).notNull(),
+  expires:      timestamp("expires").notNull(),
 });
 
 // ── NextAuth: verification tokens ─────────────────────────────────────────────
-export const verificationTokens = sqliteTable(
+export const verificationTokens = pgTable(
   "VerificationToken",
   {
     identifier: text("identifier").notNull(),
-    token:      text("token").notNull(),            // unique enforced by existing DB index
-    expires:    integer("expires", { mode: "timestamp_ms" }).notNull(),
+    token:      text("token").notNull().unique(),
+    expires:    timestamp("expires").notNull(),
   },
   (table) => ({
     pk: primaryKey({ columns: [table.identifier, table.token] }),
@@ -61,39 +59,39 @@ export const verificationTokens = sqliteTable(
 );
 
 // ── Caption generations ────────────────────────────────────────────────────────
-export const generations = sqliteTable("Generation", {
+export const generations = pgTable("Generation", {
   id:         text("id").primaryKey(),
   userId:     text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   folderId:   text("folderId").notNull(),
   imageCount: integer("imageCount").notNull().default(1),
   captions:   text("captions").notNull(),   // JSON string
   formData:   text("formData").notNull(),   // JSON string
-  createdAt:  integer("createdAt", { mode: "timestamp_ms" }).notNull(),
-});
-
-// ── Favourite captions ────────────────────────────────────────────────────────
-export const favourites = sqliteTable("Favourite", {
-  id:          text("id").primaryKey(),
-  userId:      text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
-  captionText: text("captionText").notNull(),
-  hashtags:    text("hashtags").notNull().default("[]"),  // JSON string[]
-  platform:    text("platform"),
-  tone:        text("tone"),
-  imageDesc:   text("imageDesc"),
-  createdAt:   integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+  createdAt:  timestamp("createdAt").defaultNow().notNull(),
 });
 
 // ── Image description cache ────────────────────────────────────────────────────
-export const imageDescriptions = sqliteTable(
+export const imageDescriptions = pgTable(
   "ImageDescription",
   {
     folderId:    text("folderId").notNull(),
     filename:    text("filename").notNull(),
     description: text("description").notNull(),
-    model:       text("model").notNull().default("gemini-2.0-flash"),
-    createdAt:   integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    model:       text("model").notNull().default("groq-vision"),
+    createdAt:   timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => ({
     pk: primaryKey({ columns: [table.folderId, table.filename] }),
   })
 );
+
+// ── Favourites ────────────────────────────────────────────────────────────────
+export const favourites = pgTable("Favourite", {
+  id:          text("id").primaryKey(),
+  userId:      text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  captionText: text("captionText").notNull(),
+  hashtags:    text("hashtags").notNull().default("[]"),
+  platform:    text("platform"),
+  tone:        text("tone"),
+  imageDesc:   text("imageDesc"),
+  createdAt:   timestamp("createdAt").defaultNow().notNull(),
+});

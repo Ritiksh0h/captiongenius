@@ -1,19 +1,11 @@
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "./schema";
-import path from "path";
 
-// Resolve relative to project root (process.cwd() at Next.js startup)
-const dbPath = path.resolve(
-  process.cwd(),
-  process.env.DATABASE_URL ?? "./dev.db"
-);
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is not set");
+}
 
-const sqlite = new Database(dbPath);
-
-sqlite.pragma("journal_mode = WAL");   // WAL: better concurrent read performance
-sqlite.pragma("synchronous = NORMAL"); // faster writes, safe with WAL
-sqlite.pragma("foreign_keys = ON");    // enforce FK constraints at the DB level
-
-export const db = drizzle(sqlite, { schema });
+const sql = neon(process.env.DATABASE_URL);
+export const db = drizzle(sql, { schema });
 export type DB = typeof db;

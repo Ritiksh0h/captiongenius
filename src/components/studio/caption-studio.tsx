@@ -7,6 +7,7 @@ import {
   Check,
   Copy,
   RotateCcw,
+  Share2,
   Sparkles,
 } from "lucide-react";
 import { useSession, signIn } from "next-auth/react";
@@ -281,6 +282,28 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
     }
   }
 
+  // ── Share handler (Web Share API, clipboard fallback) ───────────────────────
+  async function handleShare(index: number) {
+    const caption = results[index];
+    if (!caption) return;
+
+    const text = config.hashtags && caption.hashtags.length > 0
+      ? `${caption.text}\n\n${caption.hashtags.join(" ")}`
+      : caption.text;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return; // user cancelled
+      }
+    }
+    // Fallback: copy to clipboard
+    await navigator.clipboard?.writeText(text);
+    toast.success("Caption copied — ready to paste anywhere");
+  }
+
   async function regenerate() {
     setFavouritedIds(new Map());
     await generate();
@@ -527,6 +550,7 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
                       onEdit={handleEdit}
                       onFavourite={handleFavourite}
                       isFavourited={favouritedIds.has(i)}
+                      onShare={handleShare}
                     />
                   ))}
                 </div>
@@ -555,6 +579,35 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
                       ? <Check className="h-3.5 w-3.5 text-lime" />
                       : <Copy className="h-3.5 w-3.5" />}
                     {copiedAll ? "Copied" : "Copy all"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const text = results
+                        .map((r, i) => {
+                          const tags = config.hashtags && r.hashtags.length > 0
+                            ? `\n${r.hashtags.join(" ")}`
+                            : "";
+                          return `${String(i + 1).padStart(2, "0")}. ${r.text}${tags}`;
+                        })
+                        .join("\n\n");
+
+                      if (typeof navigator !== "undefined" && navigator.share) {
+                        try {
+                          await navigator.share({ text, title: "My CaptionGenius captions" });
+                          return;
+                        } catch (err) {
+                          if ((err as Error).name === "AbortError") return;
+                        }
+                      }
+                      copyAll(); // fallback
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full
+                      bg-[#141414] px-4 py-2 text-[13px] font-medium text-[#F7F6F1]
+                      hover:bg-[#1c1c1c] transition-colors"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    Share
                   </button>
                 </div>
               </motion.div>

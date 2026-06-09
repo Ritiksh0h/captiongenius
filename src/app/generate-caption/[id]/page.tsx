@@ -9,11 +9,11 @@ import Loading from "@/components/Loading";
 type Props = { params: { id: string } };
 
 export default function GenerateCaptionPage({ params: { id } }: Props) {
-  const [images, setImages]   = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
-  const router                = useRouter();
-  const { status }            = useSession();
+  const [photos,     setPhotos]     = useState<{ url: string; name: string }[]>([]);
+  const [isLoading,  setIsLoading]  = useState(true);
+  const [error,      setError]      = useState<string | null>(null);
+  const router                      = useRouter();
+  const { status }                  = useSession();
 
   useEffect(() => {
     if (!id) { router.push("/"); return; }
@@ -24,14 +24,23 @@ export default function GenerateCaptionPage({ params: { id } }: Props) {
         return r.json();
       })
       .then((data) => {
-        if (!data.images?.length) throw new Error("No images found");
-        setImages(data.images);
+        const images:    string[] = data.images    || [];
+        const imageUrls: string[] = data.imageUrls || [];
+
+        if (!images.length) throw new Error("No images found");
+
+        // Use R2 public URLs for display; fall back to constructed URL if needed
+        setPhotos(
+          images.map((filename: string, i: number) => ({
+            url:  imageUrls[i] || `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/uploads/${id}/${filename}`,
+            name: filename,
+          }))
+        );
       })
       .catch(() => setError("Could not load images. Please upload again."))
       .finally(() => setIsLoading(false));
   }, [id, router]);
 
-  // Show spinner while session or images are loading
   if (isLoading || status === "loading") {
     return (
       <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
@@ -45,7 +54,6 @@ export default function GenerateCaptionPage({ params: { id } }: Props) {
     );
   }
 
-  // Session resolved — show sign-in prompt for unauthenticated users
   if (status === "unauthenticated") {
     return (
       <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
@@ -84,17 +92,14 @@ export default function GenerateCaptionPage({ params: { id } }: Props) {
     );
   }
 
-  if (!images.length) return null;
+  if (!photos.length) return null;
 
   return (
     <CaptionStudio
-      photoUrl={`/uploads/${id}/${images[0]}`}
+      photoUrl={photos[0].url}
       folderId={id}
       onBack={() => router.push("/")}
-      photos={images.map((img) => ({
-        url: `/uploads/${id}/${img}`,
-        name: img,
-      }))}
+      photos={photos}
     />
   );
 }

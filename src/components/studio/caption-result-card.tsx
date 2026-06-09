@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Bookmark, BookmarkCheck, Check, Copy, Pencil, X } from "lucide-react";
+import { Bookmark, BookmarkCheck, Check, Copy, Pencil, Share2, X } from "lucide-react";
 import type { GeneratedCaption } from "@/lib/captions";
 
 type Props = {
@@ -12,6 +12,7 @@ type Props = {
   onEdit?:       (index: number, newText: string) => void;
   onFavourite?:  (index: number) => void;
   isFavourited?: boolean;
+  onShare?:      (index: number) => void;
 };
 
 export function CaptionResultCard({
@@ -21,6 +22,7 @@ export function CaptionResultCard({
   onEdit,
   onFavourite,
   isFavourited,
+  onShare,
 }: Props) {
   const [copied,   setCopied]   = useState(false);
   const [editing,  setEditing]  = useState(false);
@@ -100,6 +102,19 @@ export function CaptionResultCard({
                 hover:border-[#2a2a2a] hover:text-[#F7F6F1]"
             >
               <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+
+          {!editing && (
+            <button
+              type="button"
+              onClick={() => onShare?.(index)}
+              aria-label="Share caption"
+              className="rounded-lg border border-[#1a1a1a] p-1.5 text-[#3a3a3a]
+                opacity-0 group-hover:opacity-100 transition-all
+                hover:border-[#2a2a2a] hover:text-[#F7F6F1]"
+            >
+              <Share2 className="h-3.5 w-3.5" />
             </button>
           )}
 

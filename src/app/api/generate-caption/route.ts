@@ -58,7 +58,8 @@ export async function POST(req: NextRequest) {
     const limit = LIMITS[role] ?? 5;
 
     const now       = new Date();
-    const resetDate = user.resetDate ? new Date(user.resetDate) : new Date(0);
+    // Postgres returns timestamp as a native Date — no new Date() wrapper needed
+    const resetDate = user.resetDate ?? new Date(0);
     if (now.getMonth() !== resetDate.getMonth() || now.getFullYear() !== resetDate.getFullYear()) {
       await db.update(users).set({ captionsUsed: 0, resetDate: now }).where(eq(users.id, userId));
       user.captionsUsed = 0;

@@ -1,88 +1,26 @@
-import { join } from "path";
-import { stat, readdir } from "fs/promises";
 import { NextRequest, NextResponse } from "next/server";
+import { listR2Objects } from "@/lib/r2";
 
 export const dynamic = "force-dynamic";
 
-interface FolderInfo {
-  folderId: string;
-  images: string[];
-}
-
 export async function GET(req: NextRequest) {
-  try {
-    const folderId = req.nextUrl.searchParams.get("folderId");
+  const folderId = req.nextUrl.searchParams.get("folderId");
 
-    if (!folderId) {
-      return await getAllFoldersWithImages();
-    }
-
-    return await getUniqueFolderByIdWithImages(folderId);
-  } catch (error) {
-    console.error("Error:", error);
-    return NextResponse.json(
-      { error: "An error occurred while processing the request." },
-      { status: 500 }
-    );
+  if (!folderId) {
+    return NextResponse.json({ error: "Missing folderId" }, { status: 400 });
   }
-}
-
-async function getAllFoldersWithImages() {
-  const uploadDir = join(process.cwd(), "public", "/uploads");
 
   try {
-    const folderNames = await readdir(uploadDir);
-    const foldersWithImages: FolderInfo[] = [];
+    const keys = await listR2Objects(`uploads/${folderId}/`);
 
-    for (const folderName of folderNames) {
-      const folderPath = join(uploadDir, folderName);
-      const folderStat = await stat(folderPath);
+    // filenames only — backward-compatible with existing consumers
+    const images    = keys.map((k) => k.split("/").pop()!).filter(Boolean);
+    // full R2 public URLs for display in the studio
+    const imageUrls = keys.map((k) => `${process.env.R2_PUBLIC_URL}/${k}`);
 
-      if (folderStat.isDirectory()) {
-        const imageFiles = await readdir(folderPath);
-        const images = imageFiles.filter((file) =>
-          /\.(png|jpe?g|gif)$/i.test(file)
-        );
-        if (images.length > 0) {
-          foldersWithImages.push({ folderId: folderName, images });
-        }
-      }
-    }
-
-    return NextResponse.json({ foldersWithImages }, { status: 200 });
-  } catch (error) {
-    console.error("Error retrieving folders with images:", error);
-    return NextResponse.json(
-      { error: "An error occurred while retrieving folders with images." },
-      { status: 500 }
-    );
-  }
-}
-
-async function getUniqueFolderByIdWithImages(folderId: string) {
-  const uploadDir = join(process.cwd(), "public", "/uploads", folderId);
-
-  try {
-    const folderStat = await stat(uploadDir);
-
-    if (folderStat.isDirectory()) {
-      const imageFiles = await readdir(uploadDir);
-      const images = imageFiles.filter((file) =>
-        /\.(png|jpe?g|gif)$/i.test(file)
-      );
-
-      return NextResponse.json({ folderId, images }, { status: 200 });
-    } else {
-      return NextResponse.json(
-        { error: "Folder not found or is not a directory." },
-        { status: 404 }
-      );
-    }
-  } catch (error) {
-    console.error("Error retrieving folder with images:", error);
-    return NextResponse.json(
-      { error: "An error occurred while retrieving folder with images." },
-      { status: 500 }
-    );
+    return NextResponse.json({ images, imageUrls });
+  } catch (err) {
+    console.error("[image] Error:", err);
+    return NextResponse.json({ error: "Failed to list images." }, { status: 500 });
   }
 }
