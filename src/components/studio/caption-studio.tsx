@@ -180,6 +180,13 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
       const data = await res.json();
 
       if (!res.ok) {
+        if (data.paused) {
+          toast.error("CaptionGenius is temporarily paused.", {
+            description: "We're managing resource usage. Try again in a few minutes.",
+          });
+          setView("config");
+          return;
+        }
         if (data.rateLimited) {
           toast.error("Rate limited — please wait 30 seconds and try again.");
           setView("config");

@@ -5,6 +5,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users, generations } from "@/db/schema";
 import { generateCaptionsWithGroq, parseCaptionResponse } from "@/lib/ai";
+import { isKillSwitchActive } from "@/lib/kill-switch";
 
 const LIMITS: Record<string, number> = { free: 5, plus: 50, pro: 200 };
 
@@ -42,6 +43,14 @@ Example: {"captions": ["Caption one", "Caption two", "Caption three", "Caption f
 export async function POST(req: NextRequest) {
   try {
     // ── AUTH ──────────────────────────────────────────────────────────────────
+    // ── KILL SWITCH ───────────────────────────────────────────────────────────
+    if (await isKillSwitchActive()) {
+      return NextResponse.json(
+        { error: "CaptionGenius is temporarily paused for maintenance. Please try again later.", paused: true },
+        { status: 503 }
+      );
+    }
+
     const session = await getServerSession(authOptions);
     if (!(session?.user as any)?.id) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

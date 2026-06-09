@@ -3,6 +3,7 @@ import {
   text,
   integer,
   timestamp,
+  boolean,
   primaryKey,
 } from "drizzle-orm/pg-core";
 
@@ -94,4 +95,24 @@ export const favourites = pgTable("Favourite", {
   tone:        text("tone"),
   imageDesc:   text("imageDesc"),
   createdAt:   timestamp("createdAt").defaultNow().notNull(),
+});
+
+// ── System metrics snapshots ───────────────────────────────────────────────────
+export const systemMetrics = pgTable("SystemMetric", {
+  id:          text("id").primaryKey(),
+  metricType:  text("metricType").notNull(),  // "users" | "storage_mb" | "groq_daily" | "neon_rows"
+  value:       integer("value").notNull(),
+  threshold:   integer("threshold").notNull(),
+  status:      text("status").notNull(),      // "ok" | "warning" | "exceeded"
+  recordedAt:  timestamp("recordedAt").defaultNow().notNull(),
+});
+
+// ── Kill switch — operational pause control (singleton row, id="singleton") ────
+export const killSwitch = pgTable("KillSwitch", {
+  id:          text("id").primaryKey().default("singleton"),
+  isActive:    boolean("isActive").notNull().default(false),
+  reason:      text("reason"),
+  activatedAt: timestamp("activatedAt"),
+  approvedAt:  timestamp("approvedAt"),
+  approvedBy:  text("approvedBy"),
 });

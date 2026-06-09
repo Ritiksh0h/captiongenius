@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadToR2 } from "@/lib/r2";
+import { isKillSwitchActive } from "@/lib/kill-switch";
 import { randomBytes } from "crypto";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -7,6 +8,13 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 export async function POST(req: NextRequest) {
   try {
+    if (await isKillSwitchActive()) {
+      return NextResponse.json(
+        { error: "Uploads are temporarily paused. Please try again later.", paused: true },
+        { status: 503 }
+      );
+    }
+
     const formData = await req.formData();
     const files    = formData.getAll("image") as File[];
 

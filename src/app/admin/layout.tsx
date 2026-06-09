@@ -33,6 +33,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/admin/users" className="hover:text-[#F7F6F1] transition-colors">
             Users
           </Link>
+          <Link href="/admin/health" className="hover:text-[#F7F6F1] transition-colors">
+            Health
+          </Link>
         </nav>
       </header>
       <main className="max-w-6xl mx-auto px-6 py-10">{children}</main>
