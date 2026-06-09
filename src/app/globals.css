@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── v0 design-token CSS variables ──────────────────────────────────────── */
+/*
+  RGB channel values (space-separated) used by Tailwind's opacity modifier
+  syntax: rgb(var(--color-lime) / 0.2)
+  Approximations of the v0's oklch() values in sRGB:
+    oklch(0.88 0.21 124) → ~rgb(179 238 110)  lime
+    oklch(0.16 0.005 60) → ~rgb(26 23 16)     lime-foreground (dark)
+    oklch(0.13 0.005 60) → ~rgb(19 17 12)     ink
+    oklch(0.68 0.2 32)  → ~rgb(224 112 82)   coral
+*/
+:root {
+  --color-lime: 179 238 110;
+  --color-lime-foreground: 26 23 16;
+  --color-ink: 19 17 12;
+  --color-coral: 224 112 82;
+
+  /* Semantic surface tokens (HSL) used by bg-background, text-foreground, etc. */
+  --background: 45 50% 97%;
+  --foreground: 30 20% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 30 20% 12%;
+  --muted: 40 20% 94%;
+  --muted-foreground: 30 8% 45%;
+  --border: 38 15% 88%;
+  --ring: 88 75% 58%;
+
+  /* radix / shadcn radius kept for accordion etc. */
+  --radius: 0.875rem;
+}
+
+/* ── v0 utility classes ──────────────────────────────────────────────────── */
+
+/* Dot-grid grain overlay used in the hero section */
+.grain {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgb(var(--color-lime) / 0.18) 1px,
+    transparent 0
+  );
+  background-size: 22px 22px;
+}
+
+/* ── v0 animation utilities ─────────────────────────────────────────────── */
+
+.animate-cursor {
+  animation: blink 1s step-end infinite;
+}
+
+.animate-flap {
+  animation: flap-in 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.animate-spark {
+  animation: spark 0.6s ease-out forwards;
+}
