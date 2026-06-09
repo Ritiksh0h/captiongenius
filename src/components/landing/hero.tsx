@@ -51,8 +51,9 @@ export function Hero() {
           <a href="#faq"     className="text-white/70 transition-colors hover:text-white">FAQ</a>
           {status === "authenticated" && (
             <>
-              {navLink("/dashboard", "Dashboard")}
-              {navLink("/history",   "History")}
+              {navLink("/dashboard",  "Dashboard")}
+              {navLink("/history",    "History")}
+              {navLink("/favourites", "Favourites")}
             </>
           )}
         </nav>
@@ -154,6 +155,12 @@ export function Hero() {
                     pathname === "/history" ? "text-white" : "text-white/80 hover:text-white"
                   }`}>
                   History
+                </Link>
+                <Link href="/favourites" onClick={() => setMenuOpen(false)}
+                  className={`px-3 py-2.5 text-sm rounded-xl hover:bg-white/10 transition-colors ${
+                    pathname === "/favourites" ? "text-white" : "text-white/80 hover:text-white"
+                  }`}>
+                  Favourites
                 </Link>
               </>
             )}

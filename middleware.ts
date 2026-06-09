@@ -29,6 +29,7 @@ export const config = {
     "/dashboard/:path*",
     "/admin/:path*",
     "/history/:path*",
+    "/favourites/:path*",
     "/api/billing/:path*",
   ],
 };

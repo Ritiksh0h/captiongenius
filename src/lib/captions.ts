@@ -141,10 +141,11 @@ export const LENGTHS: { id: LengthId; label: string }[] = [
 ]
 
 export type GeneratedCaption = {
-  text: string
+  text:     string
   hashtags: string[]
+  edited?:  boolean   // true when the user has manually edited the text
   // optional fields added when parsing from API strings
-  id?: string
+  id?:      string
   caption?: string
 }
 

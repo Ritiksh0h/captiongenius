@@ -71,6 +71,18 @@ export const generations = sqliteTable("Generation", {
   createdAt:  integer("createdAt", { mode: "timestamp_ms" }).notNull(),
 });
 
+// ── Favourite captions ────────────────────────────────────────────────────────
+export const favourites = sqliteTable("Favourite", {
+  id:          text("id").primaryKey(),
+  userId:      text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  captionText: text("captionText").notNull(),
+  hashtags:    text("hashtags").notNull().default("[]"),  // JSON string[]
+  platform:    text("platform"),
+  tone:        text("tone"),
+  imageDesc:   text("imageDesc"),
+  createdAt:   integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+});
+
 // ── Image description cache ────────────────────────────────────────────────────
 export const imageDescriptions = sqliteTable(
   "ImageDescription",

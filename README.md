@@ -11,97 +11,109 @@ CaptionGenius turns any uploaded photo into five ready-to-post social media capt
 ### Landing page — Hero
 ![Hero section showing the dark ink background with lime green headline "Your photo. Five perfect captions. Three seconds." and an animated demo card showing a coffee photo with a live-generated caption](docs/screenshots/hero.png)
 
-The hero features a live-cycling demo card that auto-types captions in different tones (Funny → Emotional → Brand → Bold) every few seconds — no signup required to see the engine work.
+The hero features a live-cycling demo card that auto-types captions in different tones — no signup required to see the engine work.
 
 ### Interactive tone explorer
 ![Caption explorer showing a brunch food photo with five tone pills: Funny, Storytelling, Brand, Emotional, Bold — and a live caption below](docs/screenshots/explorer.png)
 
-Tap any tone pill and the caption rewrites itself instantly. This is the actual Groq model running live — not a static example.
+Tap any tone pill and the caption rewrites itself instantly. This is the actual Groq model running live.
 
 ### Style showcase
 ![Range showcase on dark background showing 4 photo cards: Español, Influencer, Storytelling, Corporate — each with a different caption style and hashtags](docs/screenshots/range.png)
-
-Four photos. Four wildly different voices. Español, Influencer, Storytelling, Corporate — same AI, different output.
 
 ### Pricing
 ![Pricing section with three cards: Free ($0/forever), Plus ($9.99/mo, highlighted), Pro ($29.99/mo)](docs/screenshots/pricing.png)
 
 ### FAQ
-![FAQ accordion section on black background with 8 questions, all collapsed, lime "FAQ" label at top](docs/screenshots/faq.png)
+![FAQ accordion section on black background with 8 questions, lime "FAQ" label at top](docs/screenshots/faq.png)
 
 ### Caption Studio
-![Caption studio split layout: left panel shows a golden retriever photo with thumbnail strip, right panel shows configure form with platform pills, caption style chips, tone, length selectors](docs/screenshots/studio.png)
+![Caption studio split layout: left panel shows a golden retriever photo with thumbnail strip, right panel shows dark configure form with platform pills, caption style chips, tone, length selectors](docs/screenshots/studio.png)
 
-The studio is a two-panel layout — photo on the left, configuration form on the right. The image is auto-described by Groq vision the moment you arrive, pre-filling the description field.
+Two-panel dark interface. Photo on the left, configuration on the right. Groq vision auto-describes the photo on arrival.
 
 ### Mobile
-![Mobile view showing full-width hero text "Your photo. Five perfect captions. Three seconds." in lime and white, with sticky "Sign in to start" button at bottom](docs/screenshots/mobile-hero.png)
-
-Fully responsive. Sticky upload CTA at the bottom of every page on mobile.
+![Mobile view showing full-width hero text with sticky "Sign in to start" button at bottom](docs/screenshots/mobile-hero.png)
 
 ---
 
 ## How It Works
 
 ```
-User uploads photo  →  stored in /public/uploads/{folderId}/
+User uploads photo(s)  →  stored in /public/uploads/{folderId}/
         ↓
-Groq Llama 4 Scout vision describes the image  (cached in SQLite forever)
+Groq Llama 4 Scout vision describes each image  (cached in SQLite — one call per image)
   "A golden retriever mid-run across a sunlit park"
         ↓
-User picks: platform · style · tone · length · language · hashtags
+User picks: platform · style(s) · tone · length · language · hashtags on/off
         ↓
-Groq Llama 3.3 70B generates exactly 5 captions as JSON
+Groq Llama 3.3 70B generates 5 captions per image as JSON
         ↓
-Copy · Copy all · Download .txt · Regenerate
+Edit captions inline · Copy · Bookmark to Favourites · Regenerate
 ```
 
-**Why two separate AI calls?**  
-The vision call happens once per image and is cached. Switching tone from Playful to Sophisticated on the same photo costs nothing extra — the description is already in the DB and the new captions generate in ~2 seconds.
+**Why split vision and caption generation?**
+The vision call happens once per image and is cached forever. Switching tone from Playful to Sophisticated on the same photo costs nothing extra — the description is already in the DB.
 
 ---
 
 ## Features
 
-### Caption Studio
-- Upload single or multiple images (JPEG, PNG, WebP, **HEIC** — auto-converted)
-- Groq vision auto-describes the photo on arrival and pre-fills the field
-- Re-describe button at any time
-- 300ms debounce prevents stale races when switching between photos
-- Amber "type manually" warning if vision is temporarily unavailable — generation still works
+### Caption Studio (v2)
 
-### Configuration
+**Batch generation**
+- Upload multiple photos — click Generate once to get 5 captions for every photo
+- Tabbed output: click each photo tab to view its captions
+- One monthly credit consumed per batch, not per photo
+
+**Inline editing**
+- Hover any caption → pencil icon appears
+- Click to open an auto-resizing textarea
+- ⌘↵ to save · Esc to cancel
+- Saved captions show an "edited" badge; Copy and Copy All use the edited text
+
+**Favourites**
+- Bookmark any caption with the bookmark icon
+- Bookmarks persist in the database across sessions
+- Click again to unbookmark (DB record deleted)
+- `/favourites` page shows all saved captions with platform, tone, hashtag context
+
+### Configuration Options
+
 | Option | Choices |
 |---|---|
 | **Platform** | Instagram, Twitter/X, LinkedIn, TikTok, Facebook, Pinterest |
-| **Caption style** | 32 styles — Witty, Storytelling, Bold, Nostalgic, Sarcastic, Luxury, Cinematic, Pun, Confessional, Hot take... |
+| **Caption style** | 32 styles — Witty, Storytelling, Bold, Nostalgic, Sarcastic, Luxury, Cinematic, Pun... |
 | **Tone** | Playful, Inspirational, Witty, Sophisticated, Bold, Romantic, Adventurous |
 | **Length** | Snappy (< 15 words), Standard (20–40 words), Extended (60–100 words) |
 | **Language** | Any — type the language name |
 | **Hashtags** | Toggle on/off — 5–8 tags per caption |
 
-Style selection is limited per plan: Free = 1, Plus = 3, Pro = 5.
+Style selection is plan-gated: Free = 1, Plus = 3, Pro = 5.
 
 ### Output
 - 5 genuinely distinct captions (different angle + structure, not clones)
-- Per-caption copy button
-- Copy all 5 (numbered)
+- Per-caption copy, edit, and bookmark buttons (appear on hover)
+- Copy all 5 numbered at once
 - Regenerate — new results each time
 
 ### Dashboard (`/dashboard`)
-- Monthly usage bar (lime → amber → coral as limit approaches)
-- Last 6 generation cards with tone/platform badges and copy-all
+- Monthly usage bar (lime → amber → coral)
+- Last 6 generation cards with copy-all
 - Manage billing → Stripe customer portal for paid users
 
 ### History (`/history`)
 - Last 20 generations with full caption text
 - Per-caption copy button on hover
-- Timestamps and platform/tone/length metadata
+
+### Favourites (`/favourites`)
+- All bookmarked captions
+- Platform + tone badge, hashtags, source image description
+- Delete individual favourites
 
 ### Admin (`/admin`)
-- Overview: total users, total generations, plan breakdown
-- Users table with search and inline role dropdown
-- Role changes take effect immediately via PATCH API
+- Overview: total users, generations, plan breakdown
+- Users table: search + inline role management
 
 ---
 
@@ -113,10 +125,9 @@ Style selection is limited per plan: Free = 1, Plus = 3, Pro = 5.
 | **Plus** | 50 | $9.99 / month |
 | **Pro** | 200 | $29.99 / month |
 
-- Monthly counter resets automatically on the 1st
-- All plans get all features — no style/tone/language restrictions
-- Limits enforced server-side; can't be bypassed client-side
-- Stripe billing integrated — checkout, webhooks, customer portal all wired
+- Counter resets automatically on the 1st of each month
+- All plans get all platforms, tones, languages, and hashtag support
+- Stripe billing fully integrated — checkout, webhooks, customer portal
 
 ---
 
@@ -125,15 +136,15 @@ Style selection is limited per plan: Free = 1, Plus = 3, Pro = 5.
 | Layer | What |
 |---|---|
 | **Framework** | Next.js 14 App Router |
-| **Styling** | Tailwind CSS v3 — custom `lime` / `ink` / `coral` design tokens |
+| **Styling** | Tailwind CSS v3 — custom `lime` / `ink` / `coral` tokens |
 | **AI — vision** | Groq `meta-llama/llama-4-scout-17b-16e-instruct` |
-| **AI — captions** | Groq `llama-3.3-70b-versatile` → `llama-3.1-70b-versatile` → `llama-3.1-8b-instant` (auto-fallback) |
+| **AI — captions** | Groq `llama-3.3-70b-versatile` → `llama-3.1-70b-versatile` → `llama-3.1-8b-instant` |
 | **Database** | SQLite via `better-sqlite3` + Drizzle ORM (WAL mode) |
 | **Auth** | NextAuth v4, Google OAuth, JWT sessions |
 | **Payments** | Stripe Checkout + webhooks + customer portal |
 | **Animations** | Framer Motion |
 | **Toasts** | Sonner |
-| **HEIC support** | Browser Canvas API (native decoder — no WASM) |
+| **HEIC support** | Browser Canvas API — native decoder, no WASM |
 
 ---
 
@@ -141,15 +152,17 @@ Style selection is limited per plan: Free = 1, Plus = 3, Pro = 5.
 
 | Route | Method | Description |
 |---|---|---|
-| `/api/upload-image` | POST | Saves file to disk, returns `folderId` |
+| `/api/upload-image` | POST | Saves file(s) to disk, returns `folderId` |
 | `/api/image` | GET | Lists filenames in a `folderId` |
 | `/api/describe-image` | POST | Cache-first Groq vision call |
-| `/api/generate-caption` | POST | Auth-gated, quota-checked generation |
+| `/api/generate-caption` | POST | Auth-gated, quota-checked; supports batch (`imageDescriptions[]`) |
 | `/api/user/usage` | GET | `{ used, limit, remaining, role }` |
+| `/api/favourites` | GET/POST | Fetch all / save a favourite |
+| `/api/favourites/[id]` | DELETE | Remove a favourite (ownership-checked) |
 | `/api/checkout` | POST | Creates Stripe Checkout session |
-| `/api/webhooks/stripe` | POST | Handles subscription events |
+| `/api/webhooks/stripe` | POST | Handles subscription lifecycle |
 | `/api/billing/portal` | POST | Opens Stripe customer portal |
-| `/api/admin/stats` | GET | Admin-only stats |
+| `/api/admin/stats` | GET | Admin-only aggregate stats |
 | `/api/admin/users/[id]` | PATCH | Admin role change |
 
 ---
@@ -158,14 +171,13 @@ Style selection is limited per plan: Free = 1, Plus = 3, Pro = 5.
 
 ```
 User              id, email, role, captionsUsed, resetDate, stripeCustomerId, stripeSubscriptionId
-Generation        id, userId, folderId, captions (JSON), formData (JSON), createdAt
-ImageDescription  (folderId + filename) PK, description, model, createdAt   ← description cache
+Generation        id, userId, folderId, imageCount, captions (JSON), formData (JSON), createdAt
+ImageDescription  (folderId + filename) PK, description, model, createdAt   ← vision cache
+Favourite         id, userId, captionText, hashtags, platform, tone, imageDesc, createdAt
 Account           NextAuth OAuth accounts
 Session           NextAuth JWT sessions
 VerificationToken NextAuth email tokens
 ```
-
-`ImageDescription` composite PK on `(folderId, filename)` — the same image is never described twice.
 
 ---
 
@@ -179,7 +191,7 @@ npm install
 cp .env.example .env
 ```
 
-**Minimum required env vars:**
+**Required env vars:**
 ```env
 GROQ_API_KEY=          # console.groq.com — free, no card, handles vision + captions
 NEXTAUTH_SECRET=       # openssl rand -base64 32
@@ -189,7 +201,7 @@ GOOGLE_CLIENT_SECRET=
 DATABASE_URL=./dev.db
 ```
 
-**Optional (needed for Stripe billing):**
+**Optional (Stripe billing):**
 ```env
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
@@ -219,19 +231,21 @@ npm run db:studio   # visual DB browser
 ```
 src/
 ├── app/
-│   ├── page.tsx                    # Landing (Hero, CaptionExplorer, RangeShowcase, Pricing, FAQ)
+│   ├── page.tsx                    # Landing (Hero, Explorer, Styles, Pricing, FAQ)
 │   ├── generate-caption/[id]/      # Caption studio
 │   ├── dashboard/                  # User dashboard
 │   ├── history/                    # Generation history
+│   ├── favourites/                 # Bookmarked captions
 │   ├── admin/                      # Admin overview + users
-│   ├── studio/                     # Demo page (sample photos, no upload)
+│   ├── studio/                     # Demo page (sample photos)
 │   └── api/                        # All API routes
 ├── components/
 │   ├── landing/                    # Hero, CaptionExplorer, RangeShowcase, Pricing, FAQ
 │   ├── studio/                     # CaptionStudio, ConfigForm, CaptionResultCard, ScrambleLoader
 │   ├── dashboard/                  # DashboardClient
 │   ├── admin/                      # AdminUsersClient
-│   └── history/                    # CopyButton
+│   ├── history/                    # CopyButton
+│   └── favourites/                 # DeleteFavButton
 ├── db/
 │   ├── index.ts                    # Drizzle + better-sqlite3 client
 │   └── schema.ts                   # Table definitions
@@ -244,19 +258,21 @@ src/
 
 ---
 
-## Taking the Screenshots
+## Changelog
 
-The `docs/screenshots/` folder should contain these files. Run the dev server then capture with any screenshot tool:
+### v2
+- **Batch generation** — generate captions for all uploaded photos in one click (one credit per batch)
+- **Inline editing** — edit any caption in-place with auto-resizing textarea; ⌘↵ to save
+- **Favourites** — bookmark captions to `/favourites`; persisted in DB, deletable
+- **Studio redesign** — dark `#0d0d0d` cards, muted borders, glow on active pills, ring thumbnails
 
-| File | URL | Notes |
-|---|---|---|
-| `hero.png` | `/` | Desktop 1280×800, scroll to top |
-| `explorer.png` | `/#explore` | Desktop |
-| `range.png` | `/#styles` | Desktop |
-| `pricing.png` | `/#pricing` | Desktop |
-| `faq.png` | `/#faq` | Desktop |
-| `studio.png` | `/studio` | Desktop 1280×600 |
-| `mobile-hero.png` | `/` | Mobile 375×812 |
+### v1
+- Groq vision + caption generation
+- Google OAuth, JWT sessions
+- SQLite + Drizzle ORM
+- Stripe billing (Checkout, webhooks, customer portal)
+- Admin dashboard (stats, user role management)
+- History page, FAQ, dark landing page
 
 ---
 
@@ -264,26 +280,15 @@ The `docs/screenshots/` folder should contain these files. Run the dev server th
 
 | Feature | Status |
 |---|---|
-| Stripe billing — Checkout, webhooks, portal | ✅ Done |
-| Admin dashboard — stats, user role management | ✅ Done |
-| HEIC / iPhone photo support | ✅ Done |
-| Caption style limits per plan | ✅ Done |
-| Multi-image batch generation | Planned |
-| Inline caption editing | Planned |
-| Favourite captions (bookmarks) | Planned |
-| S3 / R2 image storage (for serverless) | Planned |
-| Postgres support (for multi-instance) | Planned |
+| Stripe billing | ✅ Done |
+| Admin dashboard | ✅ Done |
+| Batch generation | ✅ Done |
+| Inline caption editing | ✅ Done |
+| Favourites | ✅ Done |
+| Multi-instance / Postgres | Planned |
+| S3 / R2 image storage (for Vercel) | Planned |
+| Social share buttons (Web Share API) | Planned |
 | Image cleanup cron (24h TTL) | Planned |
-
----
-
-## Known Limitations
-
-**Local filesystem** — images go to `public/uploads/`. On ephemeral serverless hosts (Vercel, Railway) they vanish on redeploy. Switch to S3/R2 for production.
-
-**SQLite** — fine for single-server. Multi-instance deployments need Postgres (Drizzle dialect swap, schema unchanged).
-
-**Groq vision** — occasionally rate-limited on the free tier. Amber warning shown, users type manually, caption generation is unaffected.
 
 ---
 

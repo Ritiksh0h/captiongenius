@@ -28,8 +28,8 @@ const LENGTH_MAP: Record<string, string> = {
 };
 
 function parseCaptionString(text: string): GeneratedCaption {
-  const words    = text.split(" ");
-  const hashIdx  = words.findIndex((w) => w.startsWith("#"));
+  const words   = text.split(" ");
+  const hashIdx = words.findIndex((w) => w.startsWith("#"));
   if (hashIdx === -1) return { text, hashtags: [] };
   return {
     text:     words.slice(0, hashIdx).join(" ").trim(),
@@ -40,8 +40,8 @@ function parseCaptionString(text: string): GeneratedCaption {
 type Props = {
   photoUrl: string;
   folderId: string;
-  onBack: () => void;
-  photos?: Photo[];
+  onBack:   () => void;
+  photos?:  Photo[];
 };
 
 export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
@@ -51,12 +51,16 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
   const gallery: Photo[] =
     photos && photos.length > 0 ? photos : [{ url: photoUrl, name: "photo.png" }];
 
-  const [activePhoto,     setActivePhoto]     = useState(gallery[0]);
-  const [view,            setView]            = useState<View>("config");
-  const [results,         setResults]         = useState<GeneratedCaption[]>([]);
-  const [copiedAll,       setCopiedAll]       = useState(false);
-  const [usage,           setUsage]           = useState<{ used: number; limit: number } | null>(null);
-  const [describeStatus,  setDescribeStatus]  = useState<DescribeStatus>("idle");
+  const [activePhoto,    setActivePhoto]    = useState(gallery[0]);
+  const [view,           setView]           = useState<View>("config");
+  const [results,        setResults]        = useState<GeneratedCaption[]>([]);
+  const [batchResults,   setBatchResults]   = useState<GeneratedCaption[][]>([]);
+  const [batchIndex,     setBatchIndex]     = useState(0);
+  const [isBatch,        setIsBatch]        = useState(false);
+  const [favouritedIds,  setFavouritedIds]  = useState<Map<number, string>>(new Map());
+  const [copiedAll,      setCopiedAll]      = useState(false);
+  const [usage,          setUsage]          = useState<{ used: number; limit: number } | null>(null);
+  const [describeStatus, setDescribeStatus] = useState<DescribeStatus>("idle");
 
   const [config, setConfig] = useState<ConfigState>({
     description: "",
@@ -68,7 +72,6 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
     hashtags:    true,
   });
 
-  // ── Usage fetch — memoized so both mount and post-generate can call it ──────
   const refreshUsage = useCallback(() => {
     if (!session?.user) return;
     fetch("/api/user/usage")
@@ -77,14 +80,10 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
       .catch(() => {});
   }, [session]);
 
-  useEffect(() => {
-    refreshUsage();
-  }, [refreshUsage]);
+  useEffect(() => { refreshUsage(); }, [refreshUsage]);
 
-  // ── Auto-describe when photo changes (300ms debounce to cancel stale races) ─
   useEffect(() => {
     if (!folderId || !activePhoto.name) return;
-
     setDescribeStatus("loading");
 
     const timer = setTimeout(() => {
@@ -116,11 +115,10 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
         });
     }, 300);
 
-    return () => clearTimeout(timer); // cancel if photo changes again within 300ms
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folderId, activePhoto.name]);
 
-  // ── Re-describe button ───────────────────────────────────────────────────
   async function redescribe() {
     if (!folderId || !activePhoto.name) return;
     setDescribeStatus("loading");
@@ -147,7 +145,6 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
     }
   }
 
-  // ── Generate captions ────────────────────────────────────────────────────
   async function generate() {
     if (!session?.user) { signIn("google"); return; }
     if (config.styles.length === 0) {
@@ -158,18 +155,24 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
     setView("loading");
 
     try {
+      const isBatchMode  = gallery.length > 1;
+      const descriptions = gallery.map((photo) =>
+        photo.url === activePhoto.url ? config.description || "" : ""
+      );
+
       const res = await fetch("/api/generate-caption", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
+        body: JSON.stringify({
           folderId,
-          imageDescription: config.description,
-          platform:         config.platform,
-          type:             config.styles,
-          tone:             config.tone,
-          length:           LENGTH_MAP[config.length] ?? "📝 Standard",
-          language:         config.language || "English",
-          hashtag:          config.hashtags,
+          imageDescription:  config.description,
+          imageDescriptions: isBatchMode ? descriptions : undefined,
+          platform:          config.platform,
+          type:              config.styles,
+          tone:              config.tone,
+          length:            LENGTH_MAP[config.length] ?? "📝 Standard",
+          language:          config.language || "English",
+          hashtag:           config.hashtags,
         }),
       });
 
@@ -192,18 +195,97 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
         throw new Error(data.error ?? "Generation failed");
       }
 
-      setResults((data.captions as string[]).map(parseCaptionString));
-      setView("output");
+      if (data.isBatch && data.allCaptions) {
+        const parsed = (data.allCaptions as string[][]).map(
+          (caps) => caps.map(parseCaptionString)
+        );
+        setBatchResults(parsed);
+        setResults(parsed[0] ?? []);
+        setIsBatch(true);
+        setBatchIndex(0);
+      } else {
+        setResults((data.captions as string[]).map(parseCaptionString));
+        setIsBatch(false);
+        setBatchResults([]);
+      }
 
-      refreshUsage(); // Refresh usage counter
+      setFavouritedIds(new Map());
+      setView("output");
+      refreshUsage();
     } catch (err: any) {
       toast.error(err.message ?? "Something went wrong");
       setView("config");
     }
   }
 
-  async function regenerate() { await generate(); }
-  function backToOptions()    { setView("config"); }
+  function handleEdit(index: number, newText: string) {
+    setResults((prev) =>
+      prev.map((cap, i) =>
+        i === index ? { ...cap, text: newText, edited: true } : cap
+      )
+    );
+    if (isBatch) {
+      setBatchResults((prev) =>
+        prev.map((batch, bi) =>
+          bi === batchIndex
+            ? batch.map((cap, ci) =>
+                ci === index ? { ...cap, text: newText, edited: true } : cap
+              )
+            : batch
+        )
+      );
+    }
+  }
+
+  async function handleFavourite(index: number) {
+    const caption = results[index];
+    if (!caption || !session?.user) return;
+
+    const existingId = favouritedIds.get(index);
+
+    if (existingId) {
+      try {
+        const res = await fetch(`/api/favourites/${existingId}`, { method: "DELETE" });
+        if (res.ok) {
+          setFavouritedIds((prev) => {
+            const next = new Map(prev);
+            next.delete(index);
+            return next;
+          });
+        }
+      } catch {
+        toast.error("Could not remove favourite");
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/favourites", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          captionText: caption.text,
+          hashtags:    caption.hashtags,
+          platform:    config.platform,
+          tone:        config.tone,
+          imageDesc:   config.description,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setFavouritedIds((prev) => new Map([...prev, [index, data.id as string]]));
+        toast.success("Saved to favourites");
+      }
+    } catch {
+      toast.error("Could not save favourite");
+    }
+  }
+
+  async function regenerate() {
+    setFavouritedIds(new Map());
+    await generate();
+  }
+  function backToOptions() { setView("config"); }
 
   function copyAll() {
     const text = results
@@ -221,28 +303,36 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F7F6F1] lg:flex lg:h-screen lg:overflow-hidden">
-      {/* Usage indicator — fixed top-right */}
+      {/* Usage indicator */}
       {usage && (
         <div className="fixed right-4 top-4 z-50">
           <UsageIndicator used={usage.used} limit={usage.limit} />
         </div>
       )}
 
-      {/* LEFT PANEL — photo */}
-      <aside className="border-b border-[#1a1a1a] bg-[#111111] p-5 lg:w-2/5 lg:border-b-0 lg:border-r lg:p-8">
-        <div className="flex h-full flex-col">
+      {/* ── LEFT PANEL ─────────────────────────────────────────────────────── */}
+      <aside className="flex flex-col bg-[#0d0d0d] border-b border-[#141414]
+        lg:w-[42%] lg:border-b-0 lg:border-r lg:min-h-screen">
+
+        <div className="flex flex-1 flex-col p-5 lg:p-8 lg:sticky lg:top-0
+          lg:h-screen lg:overflow-hidden">
+
+          {/* Mobile back — only in output view */}
           {view === "output" && (
             <button
               type="button"
               onClick={backToOptions}
-              className="mb-4 inline-flex items-center gap-2 text-sm text-[#6B6F76] transition-colors hover:text-[#F7F6F1] lg:hidden"
+              className="mb-4 inline-flex items-center gap-1.5 text-xs
+                text-[#525252] hover:text-[#F7F6F1] transition-colors lg:hidden"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3.5 w-3.5" />
               Back to options
             </button>
           )}
 
-          <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-[#1a1a1a] lg:aspect-auto lg:flex-1">
+          {/* Photo */}
+          <div className="relative flex-1 overflow-hidden rounded-2xl
+            bg-[#141414] min-h-[240px] lg:min-h-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={activePhoto.url || "/placeholder.svg"}
@@ -251,32 +341,41 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
             />
           </div>
 
+          {/* Bottom bar */}
           <div className="mt-4 flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={onBack}
-              className="rounded-full border border-[#1a1a1a] px-3 py-1.5 text-xs text-[#6B6F76] transition-colors hover:border-[#2a2a2a] hover:text-[#F7F6F1]"
+              className="inline-flex items-center gap-1.5 text-xs text-[#525252]
+                hover:text-[#F7F6F1] transition-colors"
             >
-              ← Back
+              <ArrowLeft className="h-3 w-3" />
+              Back
             </button>
-            <span className="truncate font-mono text-xs text-[#6B6F76]">
+            <span className="truncate font-mono text-[11px] text-[#3a3a3a]">
               {activePhoto.name}
             </span>
           </div>
 
+          {/* Thumbnail strip */}
           {gallery.length > 1 && (
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1
+              [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {gallery.map((p) => (
                 <button
                   key={p.url + p.name}
                   type="button"
                   onClick={() => { setActivePhoto(p); setDescribeStatus("idle"); }}
-                  className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${
-                    activePhoto.url === p.url ? "border-lime" : "border-[#1a1a1a]"
+                  className={`h-12 w-12 shrink-0 overflow-hidden rounded-xl
+                    transition-all ${
+                    activePhoto.url === p.url
+                      ? "ring-2 ring-lime ring-offset-2 ring-offset-[#0d0d0d]"
+                      : "opacity-40 hover:opacity-70"
                   }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.url || "/placeholder.svg"} alt="" className="h-full w-full object-cover" />
+                  <img src={p.url || "/placeholder.svg"} alt=""
+                    className="h-full w-full object-cover" />
                 </button>
               ))}
             </div>
@@ -284,24 +383,10 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
         </div>
       </aside>
 
-      {/* RIGHT PANEL — config / loading / output */}
+      {/* ── RIGHT PANEL ────────────────────────────────────────────────────── */}
       <section className="relative flex-1 lg:overflow-hidden">
-        <div className="h-full overflow-y-auto px-5 pb-28 pt-6 lg:px-10 lg:pb-10 lg:pt-10">
-          {/* Mobile top bar — back button + filename, visible on all views */}
-          <div className="flex items-center justify-between mb-6 lg:hidden">
-            <button
-              type="button"
-              onClick={onBack}
-              className="inline-flex items-center gap-2 text-sm text-[#6B6F76]
-                hover:text-[#F7F6F1] transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </button>
-            <span className="text-xs text-[#6B6F76] font-mono truncate max-w-[160px]">
-              {activePhoto.name}
-            </span>
-          </div>
+        <div className="h-full overflow-y-auto px-5 pb-28 pt-7
+          lg:px-10 lg:pb-12 lg:pt-10">
 
           <AnimatePresence mode="wait">
             {view === "config" && (
@@ -312,15 +397,23 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
                 exit={{ opacity: 0, x: -24 }}
                 transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               >
-                <header className="mb-8 flex items-start justify-between gap-4">
-                  <div>
-                    <h1 className="font-heading text-2xl font-bold text-[#F7F6F1]">
-                      Configure your captions
-                    </h1>
-                    <p className="mt-1 text-sm text-[#6B6F76]">
-                      Tune the details, then let CaptionGenius write five for you.
-                    </p>
-                  </div>
+                <header className="mb-7">
+                  {/* Mobile back */}
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="mb-5 inline-flex items-center gap-1.5 text-xs
+                      text-[#525252] hover:text-[#F7F6F1] transition-colors lg:hidden"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    Back
+                  </button>
+                  <h1 className="font-heading text-xl font-bold text-[#F7F6F1] leading-tight">
+                    Configure your captions
+                  </h1>
+                  <p className="mt-1 text-[13px] text-[#525252]">
+                    Tune the details, then generate five.
+                  </p>
                 </header>
 
                 <ConfigForm
@@ -331,15 +424,22 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
                   role={role}
                 />
 
-                {/* desktop generate button */}
+                {/* Desktop generate button */}
                 <button
                   type="button"
                   onClick={generate}
-                  className="hidden w-full items-center justify-center gap-2 rounded-full bg-lime py-4 font-heading font-semibold text-[#0A0A0A] transition-transform hover:scale-[1.01] lg:flex"
+                  className="hidden w-full items-center justify-center gap-2
+                    rounded-full bg-lime py-3.5 text-[13px] font-semibold
+                    text-[#0A0A0A] transition-all hover:scale-[1.01]
+                    hover:shadow-[0_0_24px_rgba(199,240,53,0.3)] lg:flex mt-8"
                 >
-                  <Sparkles className="h-5 w-5" />
-                  {session ? "Generate 5 captions" : "Sign in to generate"}
-                  <span aria-hidden="true">&rarr;</span>
+                  <Sparkles className="h-4 w-4" />
+                  {session
+                    ? gallery.length > 1
+                      ? `Generate for ${gallery.length} photos`
+                      : "Generate 5 captions"
+                    : "Sign in to generate"}
+                  <span aria-hidden="true">→</span>
                 </button>
               </motion.div>
             )}
@@ -366,18 +466,56 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
                 transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               >
                 <header className="mb-6 flex items-center justify-between">
-                  <h2 className="font-heading text-2xl font-bold text-[#F7F6F1]">
-                    Your 5 captions
-                  </h2>
+                  <div>
+                    <h2 className="font-heading text-xl font-bold text-[#F7F6F1]">
+                      Your captions
+                    </h2>
+                    {isBatch && batchResults.length > 1 && (
+                      <p className="text-[11px] text-[#525252] mt-0.5">
+                        Photo {batchIndex + 1} of {batchResults.length}
+                      </p>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={backToOptions}
-                    className="hidden items-center gap-2 text-sm text-[#6B6F76] transition-colors hover:text-[#F7F6F1] lg:inline-flex"
+                    className="hidden items-center gap-1.5 text-xs text-[#525252]
+                      hover:text-[#F7F6F1] transition-colors lg:inline-flex"
                   >
-                    <ArrowLeft className="h-4 w-4" />
+                    <ArrowLeft className="h-3.5 w-3.5" />
                     Back to options
                   </button>
                 </header>
+
+                {/* Batch tabs */}
+                {isBatch && batchResults.length > 1 && (
+                  <div className="mb-5 flex gap-2 overflow-x-auto pb-1
+                    [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {gallery.map((photo, i) => (
+                      <button
+                        key={photo.url}
+                        type="button"
+                        onClick={() => {
+                          setBatchIndex(i);
+                          setResults(batchResults[i] ?? []);
+                          setFavouritedIds(new Map());
+                        }}
+                        className={`flex shrink-0 items-center gap-2 rounded-full
+                          px-3 py-1.5 text-[12px] font-medium transition-all ${
+                          batchIndex === i
+                            ? "bg-lime text-[#0A0A0A]"
+                            : "bg-[#141414] text-[#525252] hover:text-[#F7F6F1]"
+                        }`}
+                      >
+                        <span className="h-4 w-4 overflow-hidden rounded-full flex-shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={photo.url} alt="" className="h-full w-full object-cover" />
+                        </span>
+                        Photo {i + 1}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-3">
                   {results.map((c, i) => (
@@ -386,25 +524,36 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
                       index={i}
                       caption={c}
                       showHashtags={config.hashtags}
+                      onEdit={handleEdit}
+                      onFavourite={handleFavourite}
+                      isFavourited={favouritedIds.has(i)}
                     />
                   ))}
                 </div>
 
-                <div className="mt-6 flex flex-wrap gap-3">
+                {/* Action buttons */}
+                <div className="mt-5 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={regenerate}
-                    className="inline-flex items-center gap-2 rounded-full border border-coral px-5 py-2.5 text-sm font-medium text-coral transition-colors hover:bg-coral hover:text-[#0A0A0A]"
+                    className="inline-flex items-center gap-1.5 rounded-full
+                      border border-[#1f1f1f] px-4 py-2 text-[13px] font-medium
+                      text-[#525252] hover:border-[#FF5A3C]/50 hover:text-[#FF5A3C]
+                      transition-colors"
                   >
-                    <RotateCcw className="h-4 w-4" />
+                    <RotateCcw className="h-3.5 w-3.5" />
                     Regenerate
                   </button>
                   <button
                     type="button"
                     onClick={copyAll}
-                    className="inline-flex items-center gap-2 rounded-full bg-lime px-5 py-2.5 text-sm font-medium text-[#0A0A0A] transition-transform hover:scale-[1.02]"
+                    className="inline-flex items-center gap-1.5 rounded-full
+                      bg-[#141414] px-4 py-2 text-[13px] font-medium text-[#F7F6F1]
+                      hover:bg-[#1c1c1c] transition-colors"
                   >
-                    {copiedAll ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copiedAll
+                      ? <Check className="h-3.5 w-3.5 text-lime" />
+                      : <Copy className="h-3.5 w-3.5" />}
                     {copiedAll ? "Copied" : "Copy all"}
                   </button>
                 </div>
@@ -415,15 +564,22 @@ export function CaptionStudio({ photoUrl, folderId, onBack, photos }: Props) {
 
         {/* Mobile sticky generate bar */}
         {view === "config" && (
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#1a1a1a] bg-[#0A0A0A]/95 p-4 backdrop-blur lg:hidden">
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#141414]
+            bg-[#0A0A0A]/95 px-4 pb-6 pt-3 backdrop-blur lg:hidden">
             <button
               type="button"
               onClick={generate}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-lime py-4 font-heading font-semibold text-[#0A0A0A]"
+              className="flex w-full items-center justify-center gap-2
+                rounded-full bg-lime py-3.5 text-[13px] font-semibold
+                text-[#0A0A0A]"
             >
-              <Sparkles className="h-5 w-5" />
-              {session ? "Generate 5 captions" : "Sign in to generate"}
-              <span aria-hidden="true">&rarr;</span>
+              <Sparkles className="h-4 w-4" />
+              {session
+                ? gallery.length > 1
+                  ? `Generate for ${gallery.length} photos`
+                  : "Generate 5 captions"
+                : "Sign in to generate"}
+              <span aria-hidden="true">→</span>
             </button>
           </div>
         )}

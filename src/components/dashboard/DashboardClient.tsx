@@ -230,6 +230,13 @@ export default function DashboardClient({ user, recentGenerations, upgraded }: P
           >
             + New caption
           </Link>
+          <Link
+            href="/favourites"
+            className="hidden md:inline-flex items-center gap-1.5 text-sm
+              text-[#6B6F76] hover:text-white transition-colors"
+          >
+            Favourites
+          </Link>
           {user.isAdmin && (
             <Link
               href="/admin"

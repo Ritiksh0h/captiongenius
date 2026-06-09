@@ -2,62 +2,48 @@
 
 import { useState } from "react";
 import {
-  Bird,
-  Briefcase,
-  Camera,
-  Globe,
-  MapPin,
-  MessageCircle,
-  Music2,
-  RefreshCw,
-  Sparkles,
+  Bird, Briefcase, Camera, Globe,
+  MapPin, MessageCircle, Music2, RefreshCw, Sparkles,
 } from "lucide-react";
 import {
-  CAPTION_STYLES,
-  GEN_TONES,
-  LENGTHS,
-  PLATFORMS,
-  type LengthId,
-  type PlatformId,
+  CAPTION_STYLES, GEN_TONES, LENGTHS, PLATFORMS,
+  type LengthId, type PlatformId,
 } from "@/lib/captions";
 
 export type ConfigState = {
   description: string;
-  platform: PlatformId;
-  styles: string[];
-  tone: string;
-  length: LengthId;
-  language: string;
-  hashtags: boolean;
+  platform:    PlatformId;
+  styles:      string[];
+  tone:        string;
+  length:      LengthId;
+  language:    string;
+  hashtags:    boolean;
 };
 
-const PLATFORM_ICONS: Record<
-  PlatformId,
-  React.ComponentType<{ className?: string }>
-> = {
+const PLATFORM_ICONS: Record<PlatformId, React.ComponentType<{ className?: string }>> = {
   instagram: Camera,
-  twitter: Bird,
-  linkedin: Briefcase,
-  tiktok: Music2,
-  facebook: MessageCircle,
+  twitter:   Bird,
+  linkedin:  Briefcase,
+  tiktok:    Music2,
+  facebook:  MessageCircle,
   pinterest: MapPin,
 };
 
-// Style selection limits per plan
+// Style selection limits per plan — logic unchanged
 const STYLE_LIMITS: Record<string, number> = {
-  free:  1,
-  plus:  3,
-  pro:   5,
+  free: 1,
+  plus: 3,
+  pro:  5,
 };
 
 type DescribeStatus = "idle" | "loading" | "done" | "quota" | "error";
 
 type Props = {
-  config: ConfigState;
-  setConfig: React.Dispatch<React.SetStateAction<ConfigState>>;
-  onRedescribe: () => void;
+  config:          ConfigState;
+  setConfig:       React.Dispatch<React.SetStateAction<ConfigState>>;
+  onRedescribe:    () => void;
   describeStatus?: DescribeStatus;
-  role?: string;  // user's plan role — controls how many styles can be selected
+  role?:           string;
 };
 
 export function ConfigForm({ config, setConfig, onRedescribe, describeStatus, role }: Props) {
@@ -70,7 +56,6 @@ export function ConfigForm({ config, setConfig, onRedescribe, describeStatus, ro
   function toggleStyle(style: string) {
     setConfig((c) => {
       const isSelected = c.styles.includes(style);
-      // Block adding more if already at the limit
       if (!isSelected && c.styles.length >= maxStyles) return c;
       return {
         ...c,
@@ -82,110 +67,109 @@ export function ConfigForm({ config, setConfig, onRedescribe, describeStatus, ro
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      {/* Image description */}
-      <Field>
-        <div className="flex items-center justify-between">
-          <Label>What&apos;s in this photo?</Label>
+    <div className="flex flex-col divide-y divide-[#141414]">
+
+      {/* ── Image description ──────────────────────────────────────────── */}
+      <section className="py-6 first:pt-0">
+        <div className="flex items-baseline justify-between mb-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#525252]">
+            What&apos;s in this photo?
+          </p>
           <button
             type="button"
             onClick={onRedescribe}
-            className="flex items-center gap-1.5 text-xs text-lime transition-opacity hover:opacity-80"
+            className="flex items-center gap-1 text-[11px] text-[#525252]
+              hover:text-lime transition-colors"
           >
-            <RefreshCw className="h-3 w-3" />
+            <RefreshCw className="h-2.5 w-2.5" />
             Re-describe
           </button>
         </div>
+
         {describeStatus === "loading" ? (
-          <div className="w-full h-11 rounded-xl bg-[#1a1a1a] animate-pulse" />
+          <div className="h-10 w-full rounded-lg bg-[#141414] animate-pulse" />
         ) : (
           <input
             value={config.description}
-            onChange={(e) =>
-              setConfig((c) => ({ ...c, description: e.target.value }))
-            }
-            placeholder="Describe your photo…"
-            className="w-full rounded-xl border border-[#1a1a1a] bg-[#111111] px-4 py-3 text-sm text-[#F7F6F1] outline-none transition-colors placeholder:text-[#6B6F76] focus:border-lime/50"
+            onChange={(e) => setConfig((c) => ({ ...c, description: e.target.value }))}
+            placeholder="A golden retriever running in a sunlit park…"
+            className="w-full rounded-lg border-0 bg-[#141414] px-3.5 py-2.5
+              text-sm text-[#F7F6F1] outline-none ring-1 ring-transparent
+              placeholder:text-[#3a3a3a] focus:ring-lime/30 transition-all"
           />
         )}
+
         {describeStatus === "loading" && (
-          <p className="text-xs text-[#6B6F76] mt-1.5 animate-pulse">
-            Describing image…
+          <p className="mt-2 text-[11px] text-[#525252] animate-pulse">
+            Analysing image…
           </p>
         )}
         {describeStatus === "quota" && (
-          <p className="text-xs text-amber-400 mt-1.5">
-            AI description unavailable right now — type a description or{" "}
-            <button
-              type="button"
-              className="underline hover:text-amber-300"
-              onClick={onRedescribe}
-            >
-              retry
-            </button>
+          <p className="mt-2 text-[11px] text-amber-500/80">
+            Auto-describe unavailable —{" "}
+            <button type="button" onClick={onRedescribe}
+              className="underline hover:text-amber-400">retry</button>{" "}
+            or type above.
           </p>
         )}
         {describeStatus === "error" && (
-          <p className="text-xs text-[#FF5A3C] mt-1.5">
-            Could not describe image —{" "}
-            <button
-              type="button"
-              className="underline hover:opacity-80"
-              onClick={onRedescribe}
-            >
-              retry
-            </button>{" "}
-            or type a description manually.
+          <p className="mt-2 text-[11px] text-[#FF5A3C]/80">
+            Could not describe —{" "}
+            <button type="button" onClick={onRedescribe}
+              className="underline hover:opacity-80">retry</button>{" "}
+            or type above.
           </p>
         )}
-      </Field>
+      </section>
 
-      {/* Platform */}
-      <Field>
-        <Label>Platform</Label>
-        <div className="flex flex-wrap gap-2">
+      {/* ── Platform ───────────────────────────────────────────────────── */}
+      <section className="py-6">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#525252]">
+          Platform
+        </p>
+        <div className="flex flex-wrap gap-1.5">
           {PLATFORMS.map((p) => {
-            const Icon = PLATFORM_ICONS[p.id];
+            const Icon   = PLATFORM_ICONS[p.id];
             const active = config.platform === p.id;
             return (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => setConfig((c) => ({ ...c, platform: p.id }))}
-                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-colors ${
+                className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5
+                  text-[13px] font-medium transition-all ${
                   active
-                    ? "bg-lime text-[#0A0A0A]"
-                    : "border border-[#1a1a1a] bg-[#1a1a1a] text-[#6B6F76] hover:text-[#F7F6F1]"
+                    ? "bg-lime text-[#0A0A0A] shadow-[0_0_12px_rgba(199,240,53,0.25)]"
+                    : "bg-[#141414] text-[#525252] hover:text-[#F7F6F1] hover:bg-[#1c1c1c]"
                 }`}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-3.5 w-3.5" />
                 {p.label}
               </button>
             );
           })}
         </div>
-      </Field>
+      </section>
 
-      {/* Caption style */}
-      <Field>
-        <div className="flex items-center justify-between gap-2">
-          <Label>Caption style</Label>
-          <span className="text-[11px] text-[#6B6F76] whitespace-nowrap">
+      {/* ── Caption style ──────────────────────────────────────────────── */}
+      <section className="py-6">
+        <div className="flex items-baseline justify-between mb-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#525252]">
+            Caption style
+          </p>
+          <span className="text-[11px] text-[#525252]">
             {config.styles.length} / {maxStyles} selected
             {(role === "free" || !role) && (
-              <a
-                href="/#pricing"
-                className="ml-1.5 text-lime hover:underline"
-              >
-                upgrade for more
+              <a href="/#pricing" className="ml-1.5 text-lime hover:underline">
+                upgrade
               </a>
             )}
           </span>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {visibleStyles.map((style) => {
-            const active    = config.styles.includes(style);
-            const blocked   = !active && atLimit;
+            const active  = config.styles.includes(style);
+            const blocked = !active && atLimit;
             return (
               <button
                 key={style}
@@ -193,12 +177,12 @@ export function ConfigForm({ config, setConfig, onRedescribe, describeStatus, ro
                 onClick={() => toggleStyle(style)}
                 disabled={blocked}
                 title={blocked ? `Upgrade to select more than ${maxStyles} style${maxStyles > 1 ? "s" : ""}` : undefined}
-                className={`rounded-full px-3.5 py-1.5 text-sm transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition-all ${
                   active
-                    ? "bg-lime text-[#0A0A0A]"
+                    ? "bg-lime text-[#0A0A0A] shadow-[0_0_12px_rgba(199,240,53,0.2)]"
                     : blocked
-                    ? "border border-[#1a1a1a] bg-[#1a1a1a] text-[#6B6F76] opacity-30 cursor-not-allowed"
-                    : "border border-[#1a1a1a] bg-[#1a1a1a] text-[#6B6F76] hover:text-[#F7F6F1]"
+                    ? "bg-[#141414] text-[#3a3a3a] opacity-30 cursor-not-allowed"
+                    : "bg-[#141414] text-[#525252] hover:text-[#F7F6F1] hover:bg-[#1c1c1c]"
                 }`}
               >
                 {style}
@@ -208,17 +192,20 @@ export function ConfigForm({ config, setConfig, onRedescribe, describeStatus, ro
           <button
             type="button"
             onClick={() => setShowAllStyles((s) => !s)}
-            className="rounded-full px-3.5 py-1.5 text-sm text-lime transition-opacity hover:opacity-80"
+            className="rounded-full px-3 py-1.5 text-[13px] text-lime/70
+              hover:text-lime transition-colors"
           >
             {showAllStyles ? "Show less" : "Show all 30+"}
           </button>
         </div>
-      </Field>
+      </section>
 
-      {/* Tone */}
-      <Field>
-        <Label>Tone</Label>
-        <div className="flex flex-wrap gap-2">
+      {/* ── Tone ───────────────────────────────────────────────────────── */}
+      <section className="py-6">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#525252]">
+          Tone
+        </p>
+        <div className="flex flex-wrap gap-1.5">
           {GEN_TONES.map((tone) => {
             const active = config.tone === tone;
             return (
@@ -226,10 +213,11 @@ export function ConfigForm({ config, setConfig, onRedescribe, describeStatus, ro
                 key={tone}
                 type="button"
                 onClick={() => setConfig((c) => ({ ...c, tone }))}
-                className={`rounded-full px-3.5 py-1.5 text-sm transition-colors ${
+                className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium
+                  transition-all ${
                   active
-                    ? "bg-lime text-[#0A0A0A]"
-                    : "border border-[#1a1a1a] bg-[#1a1a1a] text-[#6B6F76] hover:text-[#F7F6F1]"
+                    ? "bg-lime text-[#0A0A0A] shadow-[0_0_12px_rgba(199,240,53,0.2)]"
+                    : "bg-[#141414] text-[#525252] hover:text-[#F7F6F1] hover:bg-[#1c1c1c]"
                 }`}
               >
                 {tone}
@@ -237,12 +225,14 @@ export function ConfigForm({ config, setConfig, onRedescribe, describeStatus, ro
             );
           })}
         </div>
-      </Field>
+      </section>
 
-      {/* Length */}
-      <Field>
-        <Label>Length</Label>
-        <div className="inline-flex rounded-full border border-[#1a1a1a] bg-[#111111] p-1">
+      {/* ── Length ─────────────────────────────────────────────────────── */}
+      <section className="py-6">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#525252]">
+          Length
+        </p>
+        <div className="inline-flex rounded-full bg-[#141414] p-[3px] gap-[2px]">
           {LENGTHS.map((l) => {
             const active = config.length === l.id;
             return (
@@ -250,10 +240,11 @@ export function ConfigForm({ config, setConfig, onRedescribe, describeStatus, ro
                 key={l.id}
                 type="button"
                 onClick={() => setConfig((c) => ({ ...c, length: l.id }))}
-                className={`rounded-full px-5 py-1.5 text-sm transition-colors ${
+                className={`rounded-full px-5 py-1.5 text-[13px] font-medium
+                  transition-all ${
                   active
-                    ? "bg-lime text-[#0A0A0A]"
-                    : "text-[#6B6F76] hover:text-[#F7F6F1]"
+                    ? "bg-lime text-[#0A0A0A] shadow-[0_0_12px_rgba(199,240,53,0.2)]"
+                    : "text-[#525252] hover:text-[#F7F6F1]"
                 }`}
               >
                 {l.label}
@@ -261,69 +252,54 @@ export function ConfigForm({ config, setConfig, onRedescribe, describeStatus, ro
             );
           })}
         </div>
-      </Field>
+      </section>
 
-      {/* Language */}
-      <Field>
-        <Label>Language</Label>
-        <div className="flex items-center gap-2 rounded-xl border border-[#1a1a1a] bg-[#111111] px-4 py-3 focus-within:border-lime/50">
-          <Globe className="h-4 w-4 shrink-0 text-[#6B6F76]" />
+      {/* ── Language ───────────────────────────────────────────────────── */}
+      <section className="py-6">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-[#525252]">
+          Language
+        </p>
+        <div className="flex items-center gap-2 rounded-lg bg-[#141414]
+          px-3.5 py-2.5 ring-1 ring-transparent focus-within:ring-lime/30
+          transition-all">
+          <Globe className="h-3.5 w-3.5 shrink-0 text-[#525252]" />
           <input
             value={config.language}
-            onChange={(e) =>
-              setConfig((c) => ({ ...c, language: e.target.value }))
-            }
+            onChange={(e) => setConfig((c) => ({ ...c, language: e.target.value }))}
             placeholder="English (default)"
-            className="w-full bg-transparent text-sm text-[#F7F6F1] outline-none placeholder:text-[#6B6F76]"
+            className="w-full bg-transparent text-sm text-[#F7F6F1]
+              outline-none placeholder:text-[#3a3a3a]"
           />
         </div>
-      </Field>
+      </section>
 
-      {/* Hashtags toggle */}
-      <Field>
+      {/* ── Hashtags ───────────────────────────────────────────────────── */}
+      <section className="py-6">
         <button
           type="button"
-          onClick={() =>
-            setConfig((c) => ({ ...c, hashtags: !c.hashtags }))
-          }
+          onClick={() => setConfig((c) => ({ ...c, hashtags: !c.hashtags }))}
           className="flex w-full items-center justify-between gap-4 text-left"
         >
           <span>
-            <span className="block text-sm text-[#F7F6F1]">
+            <span className="block text-[13px] font-medium text-[#F7F6F1]">
               Include hashtags
             </span>
-            <span className="block text-xs text-[#6B6F76]">
-              5&ndash;8 relevant tags added to each caption.
+            <span className="block text-[11px] text-[#525252] mt-0.5">
+              5–8 relevant tags added per caption.
             </span>
           </span>
-          <span
-            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-              config.hashtags ? "bg-lime" : "bg-[#2a2a2a]"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-[#0A0A0A] transition-all ${
-                config.hashtags ? "left-[22px]" : "left-0.5"
-              }`}
-            />
+          <span className={`relative h-[22px] w-10 shrink-0 rounded-full
+            transition-colors ${config.hashtags ? "bg-lime" : "bg-[#2a2a2a]"}`}>
+            <span className={`absolute top-[3px] h-4 w-4 rounded-full
+              bg-[#0A0A0A] shadow-sm transition-all ${
+              config.hashtags ? "left-[22px]" : "left-[3px]"
+            }`} />
           </span>
         </button>
-      </Field>
+      </section>
 
-      <div className="h-2" />
+      <div className="h-1" />
     </div>
-  );
-}
-
-function Field({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-col gap-3">{children}</div>;
-}
-
-function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="font-heading text-sm font-semibold tracking-wide text-[#F7F6F1]">
-      {children}
-    </span>
   );
 }
 
