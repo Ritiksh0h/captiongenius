@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -9,7 +9,7 @@
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
@@ -20,20 +20,16 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "auth": ["./auth"]
+      "@/*": ["./src/*"]
     }
   },
   "include": [
-    "process.d.ts",
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts"
-, "../caption-genius/middleware.ts"  ],
+  ],
   "exclude": [
-    "node_modules",
-    "src/lib/email",
-    "src/lib/logger.ts"
+    "node_modules"
   ]
 }
