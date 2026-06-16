@@ -139,7 +139,7 @@ Style selection is plan-gated: Free = 1, Plus = 3, Pro = 5.
 | **AI — vision** | Groq `meta-llama/llama-4-scout-17b-16e-instruct` |
 | **AI — captions** | Groq `llama-3.3-70b-versatile` → `llama-3.1-70b-versatile` → `llama-3.1-8b-instant` |
 | **Database** | Neon serverless Postgres + Drizzle ORM |
-| **File storage** | Cloudflare R2 (S3-compatible, 10GB free) |
+| **File storage** | Cloudinary (free tier — 25GB storage, 25GB bandwidth/month) |
 | **Auth** | NextAuth v4, Google OAuth, JWT sessions |
 | **Payments** | Stripe Checkout + webhooks + customer portal |
 | **Email alerts** | Resend (3,000 emails/month free) |
@@ -152,8 +152,8 @@ Style selection is plan-gated: Free = 1, Plus = 3, Pro = 5.
 
 | Route | Method | Description |
 |---|---|---|
-| `/api/upload-image` | POST | Validates + uploads to R2, returns `folderId` |
-| `/api/image` | GET | Lists filenames + public R2 URLs for a folder |
+| `/api/upload-image` | POST | Validates + uploads to Cloudinary, returns `folderId` |
+| `/api/image` | GET | Lists filenames + Cloudinary URLs for a folder |
 | `/api/describe-image` | POST | Cache-first Groq vision call |
 | `/api/generate-caption` | POST | Auth + quota + kill-switch checked; batch-capable |
 | `/api/user/usage` | GET | `{ used, limit, remaining, role }` |
@@ -162,7 +162,7 @@ Style selection is plan-gated: Free = 1, Plus = 3, Pro = 5.
 | `/api/checkout` | POST | Stripe Checkout session |
 | `/api/webhooks/stripe` | POST | Subscription lifecycle |
 | `/api/billing/portal` | POST | Stripe customer portal |
-| `/api/cron/cleanup` | GET | 3am UTC — delete R2 folders older than 24h |
+| `/api/cron/cleanup` | GET | 3am UTC — delete Cloudinary folders older than 24h |
 | `/api/cron/health` | GET | 8am UTC — collect metrics, send alert if approaching/exceeded |
 | `/api/admin/kill-switch/approve` | GET | Email link handler — resume or keep paused |
 | `/api/admin/kill-switch/toggle` | POST | Admin dashboard manual toggle |
@@ -192,7 +192,7 @@ Daily cron at 8am UTC (`/api/cron/health`) checks 4 metrics:
 | Metric | Default threshold | What it measures |
 |---|---|---|
 | Total Users | 8,000 | Neon free tier row pressure |
-| R2 Storage | 8,000 MB | Cloudflare R2 free = 10GB |
+| Cloudinary Storage | 8,000 MB | Cloudinary free = 25GB |
 | Groq calls/day | 12,000 | Groq free = 14,400/day |
 | DB Row Count | 800,000 | Neon free ≈ 1M rows |
 
@@ -225,13 +225,11 @@ GOOGLE_CLIENT_SECRET=
 DATABASE_URL=postgresql://...  # neon.tech — free serverless Postgres
 ```
 
-**Storage (Cloudflare R2):**
+**Storage (Cloudinary):**
 ```env
-R2_ACCOUNT_ID=
-R2_ACCESS_KEY_ID=
-R2_SECRET_ACCESS_KEY=
-R2_BUCKET_NAME=captiongenius-uploads
-R2_PUBLIC_URL=https://pub-xxxxx.r2.dev
+CLOUDINARY_CLOUD_NAME=   # cloudinary.com → Dashboard
+CLOUDINARY_API_KEY=      # cloudinary.com → Dashboard
+CLOUDINARY_API_SECRET=   # cloudinary.com → Dashboard
 ```
 
 **Alert system:**
@@ -299,7 +297,7 @@ src/
 └── lib/
     ├── ai.ts                       # describeImage() + generateCaptionsWithGroq()
     ├── auth.ts                     # NextAuth config + ADMIN_EMAILS
-    ├── r2.ts                       # Cloudflare R2 upload/fetch/delete/list
+    ├── cloudinary.ts               # Cloudinary upload/fetch/delete/list
     ├── stripe.ts                   # Stripe client + price ID helpers
     ├── email-alerts.ts             # Resend HTML email builder + sender
     ├── health-check.ts             # Collect all 4 metrics, write DB snapshots
@@ -311,10 +309,15 @@ src/
 
 ## Changelog
 
+### v3.1
+- **Cloudinary** — replaced Cloudflare R2 with Cloudinary; `@aws-sdk/client-s3` removed; 25GB free storage
+- **Auth fix** — added `$defaultFn(() => crypto.randomUUID())` to NextAuth table IDs so `@auth/drizzle-adapter` can create users
+- **Middleware fix** — `authorized` callback now allows unauthenticated access to `/` and `/api/auth/*` to prevent redirect loop
+
 ### v3
 - **Postgres** — migrated from SQLite to Neon serverless Postgres; `better-sqlite3` removed
 - **Cloudflare R2** — images stored in R2 instead of local filesystem; Vercel-deployable
-- **Cleanup cron** — daily at 3am UTC, deletes R2 folders older than 24h
+- **Cleanup cron** — daily at 3am UTC, deletes image folders older than 24h
 - **Social share** — Share icon per caption (Web Share API on mobile, clipboard on desktop)
 - **Cost alert system** — daily health cron, Resend email alerts, auto kill switch at 100%
 - **Admin health dashboard** — live metric cards + manual kill switch toggle
