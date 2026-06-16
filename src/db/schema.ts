@@ -9,7 +9,7 @@ import {
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const users = pgTable("User", {
-  id:                   text("id").primaryKey(),
+  id:                   text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name:                 text("name"),
   email:                text("email").notNull().unique(),
   emailVerified:        timestamp("emailVerified"),
@@ -24,7 +24,7 @@ export const users = pgTable("User", {
 
 // ── NextAuth: accounts ────────────────────────────────────────────────────────
 export const accounts = pgTable("Account", {
-  id:                text("id").primaryKey(),
+  id:                text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId:            text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   type:              text("type").notNull(),
   provider:          text("provider").notNull(),
@@ -40,7 +40,7 @@ export const accounts = pgTable("Account", {
 
 // ── NextAuth: sessions ────────────────────────────────────────────────────────
 export const sessions = pgTable("Session", {
-  id:           text("id").primaryKey(),
+  id:           text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   sessionToken: text("sessionToken").notNull().unique(),
   userId:       text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   expires:      timestamp("expires").notNull(),

@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { imageDescriptions } from "@/db/schema";
 import { describeImage } from "@/lib/ai";
-import { fetchFromR2AsBuffer } from "@/lib/r2";
+import { cloudinary } from "@/lib/cloudinary";
 
 const MODEL = "groq-vision";
 
@@ -38,20 +38,24 @@ export async function POST(req: NextRequest) {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    // ── FETCH FROM R2 ─────────────────────────────────────────────────────────
-    const key = `uploads/${folderId}/${bareFilename}`;
+    // ── FETCH FROM CLOUDINARY ─────────────────────────────────────────────────
     let base64: string;
     let mimeType: string;
 
     try {
-      const buffer = await fetchFromR2AsBuffer(key);
-      base64 = buffer.toString("base64");
-      const ext = bareFilename.split(".").pop()?.toLowerCase();
-      mimeType =
-        ext === "png"  ? "image/png"  :
-        ext === "gif"  ? "image/gif"  :
-        ext === "webp" ? "image/webp" :
-        "image/jpeg";
+      let fetchUrl: string;
+      if (imageFileName.startsWith("http")) {
+        fetchUrl = imageFileName;
+      } else {
+        fetchUrl = cloudinary.url(
+          `captiongenius/uploads/${folderId}/${bareFilename}`,
+          { resource_type: "image" }
+        );
+      }
+      const res = await fetch(fetchUrl);
+      if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
+      mimeType = res.headers.get("content-type")?.split(";")[0] || "image/jpeg";
+      base64   = Buffer.from(await res.arrayBuffer()).toString("base64");
     } catch {
       return NextResponse.json(
         { error: `Image not found: ${folderId}/${bareFilename}` },

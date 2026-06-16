@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { users, generations, systemMetrics, killSwitch } from "@/db/schema";
 import { count, sql } from "drizzle-orm";
-import { listR2Objects } from "@/lib/r2";
+import { cloudinary } from "@/lib/cloudinary";
 
 export type HealthMetric = {
   type:      "users" | "storage_mb" | "groq_daily" | "neon_rows";
@@ -44,13 +44,13 @@ export async function collectHealthMetrics(): Promise<HealthReport> {
     .select({ totalUsers: count() })
     .from(users);
 
-  // 2. R2 storage estimate (2MB avg per image)
+  // 2. Cloudinary storage usage (in bytes from usage API)
   let storageMb = 0;
   try {
-    const keys = await listR2Objects("uploads/");
-    storageMb  = Math.round(keys.length * 2);
+    const usage = await cloudinary.api.usage();
+    storageMb   = Math.round((usage.storage?.usage ?? 0) / (1024 * 1024));
   } catch {
-    storageMb = 0; // R2 not configured
+    storageMb = 0;
   }
 
   // 3. Groq calls today = generation records created today
@@ -85,7 +85,7 @@ export async function collectHealthMetrics(): Promise<HealthReport> {
     },
     {
       type:      "storage_mb",
-      label:     "R2 Storage",
+      label:     "Cloudinary Storage",
       value:     storageMb,
       threshold: thresholds.storage_mb,
       pct:       Math.round((storageMb / thresholds.storage_mb) * 100),

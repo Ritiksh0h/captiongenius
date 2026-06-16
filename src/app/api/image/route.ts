@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listR2Objects } from "@/lib/r2";
+import { listCloudinaryFolder } from "@/lib/cloudinary";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +11,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const keys = await listR2Objects(`uploads/${folderId}/`);
+    const resources = await listCloudinaryFolder(`uploads/${folderId}`);
 
-    // filenames only — backward-compatible with existing consumers
-    const images    = keys.map((k) => k.split("/").pop()!).filter(Boolean);
-    // full R2 public URLs for display in the studio
-    const imageUrls = keys.map((k) => `${process.env.R2_PUBLIC_URL}/${k}`);
+    const images    = resources.map((r) => {
+      const parts = r.publicId.split("/");
+      return parts[parts.length - 1];
+    });
+
+    const imageUrls = resources.map((r) => r.url);
 
     return NextResponse.json({ images, imageUrls });
   } catch (err) {

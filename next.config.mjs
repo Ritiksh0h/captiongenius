@@ -8,7 +8,7 @@ const nextConfig = {
       },
       {
         protocol: "https",
-        hostname: "*.r2.dev",                   // Cloudflare R2 public buckets
+        hostname: "res.cloudinary.com",          // Cloudinary images
       },
     ],
   },

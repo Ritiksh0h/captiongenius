@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { uploadToR2 } from "@/lib/r2";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 import { isKillSwitchActive } from "@/lib/kill-switch";
 import { randomBytes } from "crypto";
 
@@ -38,16 +38,21 @@ export async function POST(req: NextRequest) {
     }
 
     const folderId    = randomBytes(6).toString("base64url");
-    const uploadedFiles: { imageUrl: string; filename: string }[] = [];
+    const uploadedFiles: { imageUrl: string; filename: string; publicId: string }[] = [];
 
     for (const file of files) {
       const ext      = file.type.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg";
       const filename = `${randomBytes(4).toString("hex")}-${Date.now()}.${ext}`;
-      const key      = `uploads/${folderId}/${filename}`;
       const buffer   = Buffer.from(await file.arrayBuffer());
 
-      const imageUrl = await uploadToR2({ key, body: buffer, contentType: file.type });
-      uploadedFiles.push({ imageUrl, filename });
+      const { url, publicId } = await uploadToCloudinary({
+        buffer,
+        folder:      `uploads/${folderId}`,
+        filename,
+        contentType: file.type,
+      });
+
+      uploadedFiles.push({ imageUrl: url, filename, publicId });
     }
 
     return NextResponse.json({ uploadedFiles, uniqueFolderName: folderId }, { status: 200 });

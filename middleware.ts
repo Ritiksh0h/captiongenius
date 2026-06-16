@@ -19,7 +19,11 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token,
+      authorized: ({ token, req }) => {
+        const { pathname } = req.nextUrl;
+        if (pathname === "/" || pathname.startsWith("/api/auth")) return true;
+        return !!token;
+      },
     },
   }
 );

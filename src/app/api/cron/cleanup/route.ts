@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listR2Objects, deleteFromR2 } from "@/lib/r2";
+import { listUploadFolders, listCloudinaryFolder, deleteFromCloudinary } from "@/lib/cloudinary";
 import { db } from "@/db";
 import { imageDescriptions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
-  // Verify Vercel cron secret
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new NextResponse("Unauthorized", { status: 401 });
@@ -18,41 +17,28 @@ export async function GET(req: NextRequest) {
   let deletedFiles   = 0;
 
   try {
-    const allKeys = await listR2Objects("uploads/");
+    const folders = await listUploadFolders();
 
-    // Group keys by folderId
-    const folderMap = new Map<string, string[]>();
-    for (const key of allKeys) {
-      const parts    = key.split("/");  // "uploads/{folderId}/{filename}"
-      const folderId = parts[1];
-      const filename = parts[2];
-      if (!folderId || !filename) continue;
+    for (const folderName of folders) {
+      const resources = await listCloudinaryFolder(`uploads/${folderName}`);
+      if (resources.length === 0) continue;
 
-      if (!folderMap.has(folderId)) folderMap.set(folderId, []);
-      folderMap.get(folderId)!.push(key);
-    }
+      const oldest = resources.reduce((a, b) =>
+        a.createdAt < b.createdAt ? a : b
+      );
 
-    // Use the DB description cache timestamp as a proxy for upload time
-    for (const [folderId, keys] of folderMap.entries()) {
-      const [cached] = await db
-        .select({ createdAt: imageDescriptions.createdAt })
-        .from(imageDescriptions)
-        .where(eq(imageDescriptions.folderId, folderId))
-        .limit(1);
-
-      const uploadTime = cached?.createdAt ? new Date(cached.createdAt) : new Date(0);
-
-      if (uploadTime < cutoff) {
-        for (const key of keys) {
-          await deleteFromR2(key);
+      if (oldest.createdAt < cutoff) {
+        for (const r of resources) {
+          await deleteFromCloudinary(r.publicId);
           deletedFiles++;
         }
+
         await db
           .delete(imageDescriptions)
-          .where(eq(imageDescriptions.folderId, folderId));
+          .where(eq(imageDescriptions.folderId, folderName));
 
         deletedFolders++;
-        console.log(`[cleanup] Deleted folder ${folderId} (${keys.length} files)`);
+        console.log(`[cleanup] Deleted folder ${folderName} (${resources.length} files)`);
       }
     }
 

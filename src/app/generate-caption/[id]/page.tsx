@@ -29,10 +29,9 @@ export default function GenerateCaptionPage({ params: { id } }: Props) {
 
         if (!images.length) throw new Error("No images found");
 
-        // Use R2 public URLs for display; fall back to constructed URL if needed
         setPhotos(
           images.map((filename: string, i: number) => ({
-            url:  imageUrls[i] || `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/uploads/${id}/${filename}`,
+            url:  imageUrls[i],
             name: filename,
           }))
         );
